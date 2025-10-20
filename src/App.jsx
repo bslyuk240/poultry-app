@@ -27,6 +27,7 @@ import {
   ArrowUpCircle,
   ArrowDownCircle,
 } from "lucide-react";
+import { supabase } from './supabaseClient';
 
 const App = () => {
   const [currentUser, setCurrentUser] = useState(null);
@@ -40,22 +41,65 @@ const App = () => {
   const [showSalesForm, setShowSalesForm] = useState(false);
   const [showLoanForm, setShowLoanForm] = useState(false);
   const [showExpenseForm, setShowExpenseForm] = useState(false);
+  const [showMortalityForm, setShowMortalityForm] = useState(false);
+  const [mortality, setMortality] = useState([]);
+  React.useEffect(() => {
+    const savedUser = localStorage.getItem('currentUser');
+    if (savedUser) {
+      const user = JSON.parse(savedUser);
+      setCurrentUser(user);
+      setShowLoginModal(false);
+      loadMockData();
+    }
+  }, []);
 
   const LoginModal = () => {
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [userType, setUserType] = useState("admin");
 
-    const handleLogin = () => {
+    const handleLogin = async () => {
       if (email && password) {
-        setCurrentUser({
-          id: userType === "admin" ? "admin-001" : "helper-001",
-          email,
-          role: userType,
-          name: userType === "admin" ? "Admin User" : "Sales Helper 1",
-        });
-        setShowLoginModal(false);
-        loadMockData();
+        try {
+          // Check if user exists in database
+          const { data: userData, error } = await supabase
+            .from('users')
+            .select('*')
+            .eq('email', email)
+            .single();
+
+          if (error || !userData) {
+            alert('Invalid credentials or user not found');
+            return;
+          }
+
+          // Check role matches
+          if (userData.role !== userType) {
+            alert(`This email is registered as ${userData.role}, not ${userType}`);
+            return;
+          }
+
+          setCurrentUser({
+            id: userData.id,
+            email: userData.email,
+            role: userData.role,
+            name: userData.name,
+          });
+          
+          // Save to localStorage for persistence
+          localStorage.setItem('currentUser', JSON.stringify({
+            id: userData.id,
+            email: userData.email,
+            role: userData.role,
+            name: userData.name,
+          }));
+          
+          setShowLoginModal(false);
+          loadMockData();
+        } catch (error) {
+          console.error('Login error:', error);
+          alert('Login failed. Please try again.');
+        }
       }
     };
 
@@ -131,121 +175,90 @@ const App = () => {
     );
   };
 
-  const loadMockData = () => {
-    setPurchases([
-      {
-        id: 1,
-        supplier: "Farm Fresh Poultry Ltd",
-        contact: "08012345678",
-        quantity: 100,
-        unitPrice: 1500,
-        totalAmount: 150000,
-        date: "2024-01-15",
-        time: "09:30 AM",
-        recordedBy: "Sales Helper 1",
-        recordedById: "helper-001",
-        paymentMode: "Transfer",
-        paymentProof: "receipt_001.pdf",
-        notes: "Good quality birds, delivered on time",
-      },
-      {
-        id: 2,
-        supplier: "Green Valley Farms",
-        contact: "08098765432",
-        quantity: 150,
-        unitPrice: 1400,
-        totalAmount: 210000,
-        date: "2024-01-16",
-        time: "08:15 AM",
-        recordedBy: "Sales Helper 2",
-        recordedById: "helper-002",
-        paymentMode: "Cash",
-        paymentProof: "receipt_002.pdf",
-        notes: "",
-      },
-    ]);
+  const loadMockData = async () => {
+    try {
+      // Fetch all data from Supabase
+      const { data: purchasesData, error: purchasesError } = await supabase
+        .from('purchases')
+        .select('*')
+        .order('created_at', { ascending: false });
 
-    setSales([
-      {
-        id: 1,
-        customerName: "Mrs. Johnson",
-        quantity: 10,
-        unitPrice: 2000,
-        totalAmount: 20000,
-        paymentMode: "Cash",
-        date: "2024-01-15",
-        time: "10:30 AM",
-        soldBy: "Sales Helper 1",
-        soldById: "helper-001",
-        notes: "Regular customer, paid full amount",
-      },
-      {
-        id: 2,
-        customerName: "Mr. Ahmed",
-        quantity: 5,
-        unitPrice: 2000,
-        totalAmount: 10000,
-        paymentMode: "Transfer",
-        date: "2024-01-15",
-        time: "11:45 AM",
-        soldBy: "Sales Helper 2",
-        soldById: "helper-002",
-        notes: "",
-      },
-    ]);
+      const { data: salesData, error: salesError } = await supabase
+        .from('sales')
+        .select('*')
+        .order('created_at', { ascending: false });
 
-    setLoans([
-      {
-        id: 1,
-        type: "loan_out",
-        personName: "Mrs. Adeyemi",
-        amount: 50000,
-        date: "2024-01-10",
-        time: "02:00 PM",
-        dueDate: "2024-02-10",
-        status: "pending",
-        recordedBy: "Sales Helper 1",
-        recordedById: "helper-001",
-        notes: "To be paid back by end of month",
-      },
-      {
-        id: 2,
-        type: "pay_back",
-        personName: "Mr. Bello",
-        amount: 30000,
-        date: "2024-01-12",
-        time: "11:00 AM",
-        status: "completed",
-        recordedBy: "Sales Helper 1",
-        recordedById: "helper-001",
-        notes: "Payment received in full",
-      },
-    ]);
+      const { data: loansData, error: loansError } = await supabase
+        .from('loans')
+        .select('*')
+        .order('created_at', { ascending: false });
 
-    setExpenses([
-      {
-        id: 1,
-        description: "Transportation to market",
-        amount: 5000,
-        category: "Transport",
-        date: "2024-01-15",
-        time: "09:00 AM",
-        recordedBy: "Sales Helper 1",
-        recordedById: "helper-001",
-        notes: "Fuel and bike repairs",
-      },
-      {
-        id: 2,
-        description: "Home items from market",
-        amount: 8000,
-        category: "Personal",
-        date: "2024-01-16",
-        time: "03:30 PM",
-        recordedBy: "Sales Helper 2",
-        recordedById: "helper-002",
-        notes: "Groceries for family",
-      },
-    ]);
+      const { data: expensesData, error: expensesError } = await supabase
+        .from('expenses')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      const { data: mortalityData, error: mortalityError } = await supabase
+        .from('mortality')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (purchasesError) console.error('Error loading purchases:', purchasesError);
+      if (salesError) console.error('Error loading sales:', salesError);
+      if (loansError) console.error('Error loading loans:', loansError);
+      if (expensesError) console.error('Error loading expenses:', expensesError);
+      if (mortalityError) console.error('Error loading mortality:', mortalityError);
+
+      // Convert snake_case to camelCase for compatibility
+      const mapPurchase = (p) => ({
+        ...p,
+        unitPrice: p.unit_price,
+        totalAmount: p.total_amount,
+        paymentMode: p.payment_mode,
+        paymentProof: p.payment_proof,
+        recordedBy: p.recorded_by,
+        recordedById: p.recorded_by_id,
+      });
+
+      const mapSale = (s) => ({
+        ...s,
+        customerName: s.customer_name,
+        unitPrice: s.unit_price,
+        totalAmount: s.total_amount,
+        paymentMode: s.payment_mode,
+        soldBy: s.sold_by,
+        soldById: s.sold_by_id,
+      });
+
+      const mapLoan = (l) => ({
+        ...l,
+        personName: l.person_name,
+        dueDate: l.due_date,
+        recordedBy: l.recorded_by,
+        recordedById: l.recorded_by_id,
+      });
+
+      const mapExpense = (e) => ({
+        ...e,
+        recordedBy: e.recorded_by,
+        recordedById: e.recorded_by_id,
+      });
+
+      const mapMortality = (m) => ({
+        ...m,
+        recordedBy: m.recorded_by,
+        recordedById: m.recorded_by_id,
+      });
+
+      // Set data with mapped fields
+      setPurchases(purchasesData ? purchasesData.map(mapPurchase) : []);
+      setSales(salesData ? salesData.map(mapSale) : []);
+      setLoans(loansData ? loansData.map(mapLoan) : []);
+      setExpenses(expensesData ? expensesData.map(mapExpense) : []);
+      setMortality(mortalityData ? mortalityData.map(mapMortality) : []);
+    } catch (error) {
+      console.error('Error loading data:', error);
+    }
   };
 
 /* ========== END OF PART 1 ========== */
@@ -258,31 +271,53 @@ const App = () => {
       quantity: "",
       unitPrice: "",
       paymentMode: "Cash",
+      paymentStatus: "Paid",
       paymentProof: null,
       notes: "",
     });
 
-    const handleSubmit = () => {
-      if (!formData.paymentProof) {
-        alert("Please upload payment proof!");
+    const handleSubmit = async () => {
+      if (formData.paymentStatus === "Paid" && !formData.paymentProof) {
+        alert("Please upload payment proof for paid purchases!");
         return;
       }
 
-      const newPurchase = {
-        id: purchases.length + 1,
-        ...formData,
-        quantity: parseInt(formData.quantity),
-        unitPrice: parseInt(formData.unitPrice),
-        totalAmount: parseInt(formData.quantity) * parseInt(formData.unitPrice),
-        date: new Date().toLocaleDateString(),
-        time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-        recordedBy: currentUser.name,
-        recordedById: currentUser.id,
-        paymentProof: formData.paymentProof.name,
-      };
-      setPurchases([newPurchase, ...purchases]);
-      setShowPurchaseForm(false);
-      setFormData({ supplier: "", contact: "", quantity: "", unitPrice: "", paymentMode: "Cash", paymentProof: null, notes: "" });
+      try {
+        const newPurchase = {
+          supplier: formData.supplier,
+          contact: formData.contact,
+          quantity: parseInt(formData.quantity),
+          unit_price: parseInt(formData.unitPrice),
+          total_amount: parseInt(formData.quantity) * parseInt(formData.unitPrice),
+          payment_mode: formData.paymentMode,
+          payment_status: formData.paymentStatus,
+          payment_proof: formData.paymentProof?.name || null,
+          notes: formData.notes,
+          date: new Date().toISOString().split('T')[0],
+          time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+          recorded_by: currentUser.name,
+          recorded_by_id: currentUser.id,
+        };
+
+        const { data, error } = await supabase
+          .from('purchases')
+          .insert([newPurchase])
+          .select();
+
+        if (error) {
+          console.error('Error saving purchase:', error);
+          alert('Error saving purchase. Please try again.');
+          return;
+        }
+
+        // Add to local state
+        await loadMockData();
+        setShowPurchaseForm(false);
+        setFormData({ supplier: "", contact: "", quantity: "", unitPrice: "", paymentMode: "Cash", paymentStatus: "Paid", paymentProof: null, notes: "" });
+      } catch (error) {
+        console.error('Error:', error);
+        alert('Error saving purchase. Please try again.');
+      }
     };
 
     return (
@@ -350,6 +385,21 @@ const App = () => {
             </div>
 
             <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">Payment Status *</label>
+              <select
+                className="w-full p-3 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:outline-none"
+                value={formData.paymentStatus}
+                onChange={(e) => setFormData({ ...formData, paymentStatus: e.target.value })}
+              >
+                <option value="Paid">✅ Paid (Cash/Transfer received)</option>
+                <option value="Credit">📝 On Credit (Pay later)</option>
+              </select>
+              {formData.paymentStatus === "Credit" && (
+                <p className="text-xs text-orange-600 mt-2">⚠️ This will be recorded as Accounts Payable</p>
+              )}
+            </div>
+
+            <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">Payment Mode *</label>
               <select
                 className="w-full p-3 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:outline-none"
@@ -375,7 +425,9 @@ const App = () => {
             </div>
 
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">Payment Proof * (Required)</label>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                Payment Proof {formData.paymentStatus === "Paid" ? "* (Required)" : "(Optional)"}
+              </label>
               <div className="border-2 border-dashed border-gray-300 rounded-xl p-6 text-center hover:border-blue-500 transition">
                 <input
                   type="file"
@@ -390,7 +442,7 @@ const App = () => {
                     {formData.paymentProof ? (
                       <span className="text-green-600 font-semibold">✓ {formData.paymentProof.name}</span>
                     ) : (
-                      "Click to upload receipt/proof"
+                      `Click to upload ${formData.paymentStatus === "Paid" ? "receipt/proof" : "invoice/agreement (optional)"}`
                     )}
                   </p>
                   <p className="text-xs text-gray-400 mt-1">PNG, JPG or PDF (Max 5MB)</p>
@@ -438,21 +490,40 @@ const App = () => {
       notes: "",
     });
 
-    const handleSubmit = () => {
-      const newSale = {
-        id: sales.length + 1,
-        ...formData,
-        quantity: parseInt(formData.quantity),
-        unitPrice: parseInt(formData.unitPrice),
-        totalAmount: parseInt(formData.quantity) * parseInt(formData.unitPrice),
-        date: new Date().toLocaleDateString(),
-        time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-        soldBy: currentUser.name,
-        soldById: currentUser.id,
-      };
-      setSales([newSale, ...sales]);
-      setShowSalesForm(false);
-      setFormData({ customerName: "", quantity: "", unitPrice: "2000", paymentMode: "Cash", notes: "" });
+    const handleSubmit = async () => {
+      try {
+        const newSale = {
+          customer_name: formData.customerName,
+          quantity: parseInt(formData.quantity),
+          unit_price: parseInt(formData.unitPrice),
+          total_amount: parseInt(formData.quantity) * parseInt(formData.unitPrice),
+          payment_mode: formData.paymentMode,
+          notes: formData.notes,
+          date: new Date().toISOString().split('T')[0],
+          time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+          sold_by: currentUser.name,
+          sold_by_id: currentUser.id,
+        };
+
+        const { data, error } = await supabase
+          .from('sales')
+          .insert([newSale])
+          .select();
+
+        if (error) {
+          console.error('Error saving sale:', error);
+          alert('Error saving sale. Please try again.');
+          return;
+        }
+
+        // Add to local state
+        await loadMockData(); // Replace: setSales([data[0], ...sales]);
+        setShowSalesForm(false);
+        setFormData({ customerName: "", quantity: "", unitPrice: "2000", paymentMode: "Cash", notes: "" });
+      } catch (error) {
+        console.error('Error:', error);
+        alert('Error saving sale. Please try again.');
+      }
     };
 
     return (
@@ -565,25 +636,102 @@ const App = () => {
     const [formData, setFormData] = useState({
       type: "loan_out",
       personName: "",
+      loanId: "", // NEW: For tracking which loan is being paid back
       amount: "",
       dueDate: "",
       notes: "",
     });
 
-    const handleSubmit = () => {
-      const newLoan = {
-        id: loans.length + 1,
-        ...formData,
-        amount: parseInt(formData.amount),
-        date: new Date().toLocaleDateString(),
-        time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-        status: formData.type === "loan_out" ? "pending" : "completed",
-        recordedBy: currentUser.name,
-        recordedById: currentUser.id,
-      };
-      setLoans([newLoan, ...loans]);
-      setShowLoanForm(false);
-      setFormData({ type: "loan_out", personName: "", amount: "", dueDate: "", notes: "" });
+    // Get list of people with pending loans
+    const pendingLoans = loans.filter(l => l.type === "loan_out" && l.status === "pending");
+    const uniqueDebtors = [...new Set(pendingLoans.map(l => l.personName))];
+
+    const handleSubmit = async () => {
+      try {
+        if (formData.type === "pay_back") {
+          // Find the loan being paid back
+          const loanToPay = loans.find(l => 
+            l.personName === formData.personName && 
+            l.type === "loan_out" && 
+            l.status === "pending"
+          );
+
+          if (!loanToPay) {
+            alert("No pending loan found for this person!");
+            return;
+          }
+
+          // Record the payback
+          const newPayback = {
+            type: "pay_back",
+            person_name: formData.personName,
+            amount: parseInt(formData.amount),
+            due_date: null,
+            status: "completed",
+            notes: formData.notes,
+            date: new Date().toISOString().split('T')[0],
+            time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+            recorded_by: currentUser.name,
+            recorded_by_id: currentUser.id,
+          };
+
+          const { data: paybackData, error: paybackError } = await supabase
+            .from('loans')
+            .insert([newPayback])
+            .select();
+
+          if (paybackError) {
+            console.error('Error saving payback:', paybackError);
+            alert('Error saving payback. Please try again.');
+            return;
+          }
+
+          // Check if loan is fully paid
+          const totalPaidBack = loans
+            .filter(l => l.personName === formData.personName && l.type === "pay_back")
+            .reduce((sum, l) => sum + l.amount, 0) + parseInt(formData.amount);
+
+          if (totalPaidBack >= loanToPay.amount) {
+            // Mark original loan as completed
+            await supabase
+              .from('loans')
+              .update({ status: 'completed' })
+              .eq('id', loanToPay.id);
+          }
+        } else {
+          // Loan out
+          const newLoan = {
+            type: "loan_out",
+            person_name: formData.personName,
+            amount: parseInt(formData.amount),
+            due_date: formData.dueDate || null,
+            status: "pending",
+            notes: formData.notes,
+            date: new Date().toISOString().split('T')[0],
+            time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+            recorded_by: currentUser.name,
+            recorded_by_id: currentUser.id,
+          };
+
+          const { data, error } = await supabase
+            .from('loans')
+            .insert([newLoan])
+            .select();
+
+          if (error) {
+            console.error('Error saving loan:', error);
+            alert('Error saving loan. Please try again.');
+            return;
+          }
+        }
+
+        await loadMockData();
+        setShowLoanForm(false);
+        setFormData({ type: "loan_out", personName: "", loanId: "", amount: "", dueDate: "", notes: "" });
+      } catch (error) {
+        console.error('Error:', error);
+        alert('Error saving loan transaction. Please try again.');
+      }
     };
 
     return (
@@ -607,22 +755,51 @@ const App = () => {
               <select
                 className="w-full p-3 border-2 border-gray-200 rounded-xl focus:border-orange-500 focus:outline-none"
                 value={formData.type}
-                onChange={(e) => setFormData({ ...formData, type: e.target.value })}
+                onChange={(e) => setFormData({ ...formData, type: e.target.value, personName: "", amount: "" })}
               >
-                <option value="loan_out">💸 Loan Out (Money Given)</option>
-                <option value="pay_back">💰 Pay Back (Money Received)</option>
+                <option value="loan_out">💸 Loan Out (Give Money)</option>
+                <option value="pay_back">💰 Pay Back (Receive Money)</option>
               </select>
             </div>
 
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">Person Name *</label>
-              <input
-                type="text"
-                className="w-full p-3 border-2 border-gray-200 rounded-xl focus:border-orange-500 focus:outline-none"
-                value={formData.personName}
-                onChange={(e) => setFormData({ ...formData, personName: e.target.value })}
-                placeholder="Enter person's name"
-              />
+              {formData.type === "pay_back" && uniqueDebtors.length > 0 ? (
+                <select
+                  className="w-full p-3 border-2 border-gray-200 rounded-xl focus:border-orange-500 focus:outline-none"
+                  value={formData.personName}
+                  onChange={(e) => {
+                    const selectedPerson = e.target.value;
+                    const loan = pendingLoans.find(l => l.personName === selectedPerson);
+                    setFormData({ 
+                      ...formData, 
+                      personName: selectedPerson,
+                      amount: loan ? loan.amount.toString() : ""
+                    });
+                  }}
+                >
+                  <option value="">Select person with pending loan...</option>
+                  {uniqueDebtors.map((person, idx) => {
+                    const totalOwed = pendingLoans
+                      .filter(l => l.personName === person)
+                      .reduce((sum, l) => sum + l.amount, 0);
+                    return (
+                      <option key={idx} value={person}>
+                        {person} - Owes ₦{totalOwed.toLocaleString()}
+                      </option>
+                    );
+                  })}
+                </select>
+              ) : (
+                <input
+                  type="text"
+                  className="w-full p-3 border-2 border-gray-200 rounded-xl focus:border-orange-500 focus:outline-none"
+                  value={formData.personName}
+                  onChange={(e) => setFormData({ ...formData, personName: e.target.value })}
+                  placeholder={formData.type === "pay_back" ? "No pending loans" : "Enter person's name"}
+                  disabled={formData.type === "pay_back" && uniqueDebtors.length === 0}
+                />
+              )}
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -689,19 +866,38 @@ const App = () => {
       notes: "",
     });
 
-    const handleSubmit = () => {
-      const newExpense = {
-        id: expenses.length + 1,
-        ...formData,
-        amount: parseInt(formData.amount),
-        date: new Date().toLocaleDateString(),
-        time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-        recordedBy: currentUser.name,
-        recordedById: currentUser.id,
-      };
-      setExpenses([newExpense, ...expenses]);
-      setShowExpenseForm(false);
-      setFormData({ description: "", amount: "", category: "Personal", notes: "" });
+    const handleSubmit = async () => {
+      try {
+        const newExpense = {
+          description: formData.description,
+          amount: parseInt(formData.amount),
+          category: formData.category,
+          notes: formData.notes,
+          date: new Date().toISOString().split('T')[0],
+          time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+          recorded_by: currentUser.name,
+          recorded_by_id: currentUser.id,
+        };
+
+        const { data, error } = await supabase
+          .from('expenses')
+          .insert([newExpense])
+          .select();
+
+        if (error) {
+          console.error('Error saving expense:', error);
+          alert('Error saving expense. Please try again.');
+          return;
+        }
+
+        // Add to local state
+        await loadMockData(); // Replace: setExpenses([data[0], ...expenses]);
+        setShowExpenseForm(false);
+        setFormData({ description: "", amount: "", category: "Personal", notes: "" });
+      } catch (error) {
+        console.error('Error:', error);
+        alert('Error saving expense. Please try again.');
+      }
     };
 
     return (
@@ -790,6 +986,129 @@ const App = () => {
     );
   };
 
+  const MortalityForm = () => {
+    const [formData, setFormData] = useState({
+      quantity: "",
+      reason: "Disease",
+      notes: "",
+    });
+
+    const handleSubmit = async () => {
+      try {
+        const newMortality = {
+          quantity: parseInt(formData.quantity),
+          reason: formData.reason,
+          notes: formData.notes,
+          date: new Date().toISOString().split('T')[0],
+          time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+          recorded_by: currentUser.name,
+          recorded_by_id: currentUser.id,
+        };
+
+        const { data, error } = await supabase
+          .from('mortality')
+          .insert([newMortality])
+          .select();
+
+        if (error) {
+          console.error('Error saving mortality:', error);
+          alert('Error saving mortality record. Please try again.');
+          return;
+        }
+
+        await loadMockData();
+        setShowMortalityForm(false);
+        setFormData({ quantity: "", reason: "Disease", notes: "" });
+      } catch (error) {
+        console.error('Error:', error);
+        alert('Error saving mortality record. Please try again.');
+      }
+    };
+
+    return (
+      <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl">
+          <div className="bg-gradient-to-r from-red-600 to-orange-600 text-white p-6 rounded-t-2xl">
+            <div className="flex justify-between items-center">
+              <div>
+                <h2 className="text-2xl font-bold">Record Bird Mortality</h2>
+                <p className="text-red-100 text-sm mt-1">Track deceased birds to adjust inventory</p>
+              </div>
+              <button onClick={() => setShowMortalityForm(false)} className="text-white hover:bg-white/20 p-2 rounded-lg transition">
+                <X size={24} />
+              </button>
+            </div>
+          </div>
+
+          <div className="p-6 space-y-4">
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">Number of Birds Lost *</label>
+              <input
+                type="number"
+                className="w-full p-3 border-2 border-gray-200 rounded-xl focus:border-red-500 focus:outline-none"
+                value={formData.quantity}
+                onChange={(e) => setFormData({ ...formData, quantity: e.target.value })}
+                placeholder="0"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">Reason/Cause *</label>
+              <select
+                className="w-full p-3 border-2 border-gray-200 rounded-xl focus:border-red-500 focus:outline-none"
+                value={formData.reason}
+                onChange={(e) => setFormData({ ...formData, reason: e.target.value })}
+              >
+                <option value="Disease">🦠 Disease</option>
+                <option value="Accident">⚠️ Accident</option>
+                <option value="Predator">🦅 Predator Attack</option>
+                <option value="Weather">🌧️ Weather/Environment</option>
+                <option value="Unknown">❓ Unknown</option>
+                <option value="Other">📋 Other</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">Notes/Details (Optional)</label>
+              <textarea
+                className="w-full p-3 border-2 border-gray-200 rounded-xl focus:border-red-500 focus:outline-none"
+                value={formData.notes}
+                onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                placeholder="Add any additional details about the mortality..."
+                rows="3"
+              />
+            </div>
+
+            <div className="bg-red-50 border-2 border-red-200 rounded-xl p-4">
+              <div className="flex items-start gap-3">
+                <AlertTriangle className="text-red-600 flex-shrink-0 mt-1" size={20} />
+                <div className="text-sm text-red-800">
+                  <p className="font-semibold mb-1">Inventory Impact</p>
+                  <p>Recording mortality will reduce your available stock and profit.</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex gap-3 pt-4">
+              <button
+                onClick={() => setShowMortalityForm(false)}
+                className="flex-1 py-3 border-2 border-gray-300 rounded-xl font-semibold hover:bg-gray-50 transition"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSubmit}
+                className="flex-1 py-3 bg-gradient-to-r from-red-600 to-orange-600 text-white rounded-xl font-semibold hover:shadow-lg transition"
+              >
+                Record Mortality
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
 /* ========== END OF PART 2 ========== */
 /* ========== PART 3: DASHBOARD COMPONENT ========== */
 
@@ -799,12 +1118,31 @@ const App = () => {
     const userSales = isAdmin ? sales : sales.filter((s) => s.soldById === currentUser.id);
     const userLoans = isAdmin ? loans : loans.filter((l) => l.recordedById === currentUser.id);
     const userExpenses = isAdmin ? expenses : expenses.filter((e) => e.recordedById === currentUser.id);
+    const userMortality = isAdmin ? mortality : mortality.filter((m) => m.recordedById === currentUser.id);
 
-    const totalPurchaseAmount = userPurchases.reduce((sum, p) => sum + p.totalAmount, 0);
+    // Separate paid and credit purchases
+    const paidPurchases = userPurchases.filter(p => p.payment_status === "Paid" || !p.payment_status);
+    const creditPurchases = userPurchases.filter(p => p.payment_status === "Credit");
+    
+    const totalPurchaseAmount = paidPurchases.reduce((sum, p) => sum + p.totalAmount, 0);
+    const totalCreditAmount = creditPurchases.reduce((sum, p) => sum + p.totalAmount, 0);
     const totalSalesAmount = userSales.reduce((sum, s) => sum + s.totalAmount, 0);
     const totalExpenses = userExpenses.reduce((sum, e) => sum + e.amount, 0);
+    const totalMortality = userMortality.reduce((sum, m) => sum + m.quantity, 0);
+    
+    // Loans out (money given) - this REDUCES profit until paid back
     const totalLoansOut = userLoans.filter((l) => l.type === "loan_out").reduce((sum, l) => sum + l.amount, 0);
-    const profit = totalSalesAmount - totalPurchaseAmount - totalExpenses;
+    const totalLoansIn = userLoans.filter((l) => l.type === "pay_back").reduce((sum, l) => sum + l.amount, 0);
+    const netLoansOut = totalLoansOut - totalLoansIn; // Money still owed to you
+    
+    // NEW PROFIT CALCULATION: When you loan money out, it reduces your cash (reduces profit)
+    // When money comes back, it increases profit
+    const profit = totalSalesAmount - totalPurchaseAmount - totalExpenses - netLoansOut;
+    
+    // Calculate current stock
+    const totalPurchased = userPurchases.reduce((sum, p) => sum + p.quantity, 0);
+    const totalSold = userSales.reduce((sum, s) => sum + s.quantity, 0);
+    const currentStock = totalPurchased - totalSold - totalMortality;
 
     return (
       <div className="space-y-6">
@@ -856,11 +1194,12 @@ const App = () => {
               <BarChart3 size={32} />
               <div className="bg-white/20 rounded-full px-3 py-1 text-xs font-semibold">Stock</div>
             </div>
-            <p className="text-3xl font-bold mb-1">
-              {userPurchases.reduce((sum, p) => sum + p.quantity, 0) - userSales.reduce((sum, s) => sum + s.quantity, 0)}
-            </p>
+            <p className="text-3xl font-bold mb-1">{currentStock}</p>
             <p className="text-orange-100 text-sm mb-2">Birds in Stock</p>
             <p className="text-sm">Current Inventory</p>
+            {totalMortality > 0 && (
+              <p className="text-xs mt-2 bg-red-500/20 rounded px-2 py-1">⚠️ {totalMortality} lost to mortality</p>
+            )}
           </div>
         </div>
 
@@ -879,14 +1218,54 @@ const App = () => {
           <div className="bg-gradient-to-br from-orange-100 to-red-100 rounded-2xl p-6 border-2 border-orange-200">
             <div className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-2">
-                <ArrowUpCircle className="text-orange-600" size={24} />
-                <h3 className="text-lg font-bold text-gray-800">Loans Out</h3>
+                <CreditCard className="text-orange-600" size={24} />
+                <h3 className="text-lg font-bold text-gray-800">Accounts Payable</h3>
               </div>
-              <span className="text-2xl font-bold text-orange-600">₦{totalLoansOut.toLocaleString()}</span>
+              <span className="text-2xl font-bold text-orange-600">₦{totalCreditAmount.toLocaleString()}</span>
+            </div>
+            <p className="text-sm text-gray-600">{creditPurchases.length} credit purchases</p>
+            <p className="text-xs text-gray-500 mt-1">⚠️ Need to pay suppliers</p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="bg-gradient-to-br from-blue-100 to-cyan-100 rounded-2xl p-6 border-2 border-blue-200">
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2">
+                <ArrowUpCircle className="text-blue-600" size={24} />
+                <h3 className="text-lg font-bold text-gray-800">Money Loaned Out</h3>
+              </div>
+              <span className="text-2xl font-bold text-blue-600">₦{netLoansOut.toLocaleString()}</span>
             </div>
             <p className="text-sm text-gray-600">
-              {userLoans.filter((l) => l.type === "loan_out" && l.status === "pending").length} pending
+              {userLoans.filter((l) => l.type === "loan_out" && l.status === "pending").length} pending loans
             </p>
+            <p className="text-xs text-gray-500 mt-1">💡 Reduces current profit until repaid</p>
+          </div>
+
+          <div className="bg-gradient-to-br from-red-100 to-pink-100 rounded-2xl p-6 border-2 border-red-200">
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2">
+                <AlertCircle className="text-red-600" size={24} />
+                <h3 className="text-lg font-bold text-gray-800">Bird Mortality</h3>
+              </div>
+              <span className="text-2xl font-bold text-red-600">{totalMortality}</span>
+            </div>
+            <p className="text-sm text-gray-600">{userMortality.length} mortality events</p>
+            <p className="text-xs text-gray-500 mt-1">📉 Reduces inventory value</p>
+          </div>
+        </div>
+
+        <div className="bg-gradient-to-r from-blue-50 to-purple-50 border-l-4 border-blue-500 rounded-xl p-4">
+          <div className="flex items-start gap-3">
+            <AlertCircle className="text-blue-600 flex-shrink-0 mt-1" size={24} />
+            <div>
+              <p className="font-semibold text-blue-900">How Profit is Calculated</p>
+              <p className="text-sm text-blue-800 mt-1">
+                <strong>Profit</strong> = Sales - Paid Purchases - Expenses - Money Loaned Out (until repaid). 
+                When loans are repaid, your profit increases. Credit purchases don't affect profit until you pay them.
+              </p>
+            </div>
           </div>
         </div>
 
@@ -975,6 +1354,10 @@ const App = () => {
                   <CreditCard size={24} />
                   <span className="text-sm font-semibold">Add Expense</span>
                 </button>
+                <button onClick={() => setShowMortalityForm(true)} className="bg-gradient-to-r from-red-500 to-orange-600 text-white p-4 rounded-xl hover:shadow-lg transition flex flex-col items-center gap-2 col-span-2">
+                  <AlertCircle size={24} />
+                  <span className="text-sm font-semibold">Record Mortality</span>
+                </button>
               </div>
             ) : (
               <div className="grid grid-cols-2 gap-4">
@@ -983,38 +1366,120 @@ const App = () => {
                     <Users className="text-purple-600" size={20} />
                     <h4 className="font-semibold text-gray-800">Top Performer</h4>
                   </div>
-                  <p className="text-2xl font-bold text-purple-600">Helper 1</p>
-                  <p className="text-sm text-gray-600 mt-1">Highest sales value</p>
+                  {(() => {
+                    // Calculate sales by helper
+                    const helperSales = {};
+                    sales.forEach(sale => {
+                      const helper = sale.soldBy || 'Unknown';
+                      if (!helperSales[helper]) {
+                        helperSales[helper] = 0;
+                      }
+                      helperSales[helper] += sale.totalAmount;
+                    });
+                    
+                    // Find top performer
+                    const topHelper = Object.keys(helperSales).length > 0 
+                      ? Object.keys(helperSales).reduce((a, b) => helperSales[a] > helperSales[b] ? a : b)
+                      : 'No sales yet';
+                    const topAmount = helperSales[topHelper] || 0;
+                    
+                    return (
+                      <>
+                        <p className="text-2xl font-bold text-purple-600">{topHelper}</p>
+                        <p className="text-sm text-gray-600 mt-1">
+                          {topAmount > 0 ? `₦${topAmount.toLocaleString()} in sales` : 'No sales recorded'}
+                        </p>
+                      </>
+                    );
+                  })()}
                 </div>
                 <div className="bg-gradient-to-br from-orange-50 to-red-50 border-2 border-orange-200 rounded-xl p-4">
                   <div className="flex items-center gap-2 mb-2">
                     <AlertCircle className="text-orange-600" size={20} />
-                    <h4 className="font-semibold text-gray-800">Pending Loans</h4>
+                    <h4 className="font-semibold text-gray-800">Net Loans Out</h4>
                   </div>
-                  <p className="text-2xl font-bold text-orange-600">{loans.filter((l) => l.type === "loan_out" && l.status === "pending").length}</p>
-                  <p className="text-sm text-gray-600 mt-1">
-                    ₦{loans.filter((l) => l.type === "loan_out" && l.status === "pending").reduce((sum, l) => sum + l.amount, 0).toLocaleString()} outstanding
-                  </p>
+                  {(() => {
+                    // Calculate total loans out
+                    const totalLoansOut = loans
+                      .filter((l) => l.type === "loan_out")
+                      .reduce((sum, l) => sum + l.amount, 0);
+                    
+                    // Calculate total paid back
+                    const totalPaidBack = loans
+                      .filter((l) => l.type === "pay_back")
+                      .reduce((sum, l) => sum + l.amount, 0);
+                    
+                    // Net amount still owed
+                    const netOwed = totalLoansOut - totalPaidBack;
+                    
+                    // Count unique people with pending loans
+                    const pendingDebtors = loans
+                      .filter((l) => l.type === "loan_out" && l.status === "pending")
+                      .map(l => l.personName);
+                    const uniqueDebtors = [...new Set(pendingDebtors)].length;
+                    
+                    return (
+                      <>
+                        <p className="text-2xl font-bold text-orange-600">
+                          ₦{netOwed.toLocaleString()}
+                        </p>
+                        <p className="text-sm text-gray-600 mt-1">
+                          {uniqueDebtors} {uniqueDebtors === 1 ? 'person owes' : 'people owe'} money
+                        </p>
+                      </>
+                    );
+                  })()}
                 </div>
                 <div className="bg-gradient-to-br from-blue-50 to-cyan-50 border-2 border-blue-200 rounded-xl p-4">
                   <div className="flex items-center gap-2 mb-2">
                     <TrendingUp className="text-blue-600" size={20} />
                     <h4 className="font-semibold text-gray-800">Today's Activity</h4>
                   </div>
-                  <div className="flex gap-4">
-                    <div>
-                      <p className="text-lg font-bold text-blue-600">
-                        {[...purchases, ...sales].filter((t) => t.date === new Date().toLocaleDateString()).length}
-                      </p>
-                      <p className="text-xs text-gray-600">Transactions</p>
-                    </div>
-                    <div>
-                      <p className="text-lg font-bold text-green-600">
-                        ₦{[...purchases, ...sales].filter((t) => t.date === new Date().toLocaleDateString()).reduce((sum, t) => sum + t.totalAmount, 0).toLocaleString()}
-                      </p>
-                      <p className="text-xs text-gray-600">Total Value</p>
-                    </div>
-                  </div>
+                  {(() => {
+                    // Get today's date in multiple formats to match database
+                    const today = new Date();
+                    const todayISO = today.toISOString().split('T')[0]; // 2025-01-20
+                    const todayLocal = today.toLocaleDateString('en-CA'); // 2025-01-20 (Canada format = ISO)
+                    
+                    // Filter transactions from today
+                    const todayTransactions = [...purchases, ...sales].filter((t) => {
+                      // Check if date matches in any format
+                      return t.date === todayISO || t.date === todayLocal || t.date.startsWith(todayISO);
+                    });
+                    
+                    const todayPurchases = purchases.filter((t) => 
+                      t.date === todayISO || t.date === todayLocal || t.date.startsWith(todayISO)
+                    );
+                    const todaySales = sales.filter((t) => 
+                      t.date === todayISO || t.date === todayLocal || t.date.startsWith(todayISO)
+                    );
+                    
+                    const purchaseValue = todayPurchases.reduce((sum, t) => sum + (t.totalAmount || 0), 0);
+                    const salesValue = todaySales.reduce((sum, t) => sum + (t.totalAmount || 0), 0);
+                    
+                    return (
+                      <div className="space-y-2">
+                        <div className="flex justify-between items-center">
+                          <span className="text-xs text-gray-600">Purchases:</span>
+                          <span className="text-sm font-bold text-blue-600">
+                            {todayPurchases.length} (₦{purchaseValue.toLocaleString()})
+                          </span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="text-xs text-gray-600">Sales:</span>
+                          <span className="text-sm font-bold text-green-600">
+                            {todaySales.length} (₦{salesValue.toLocaleString()})
+                          </span>
+                        </div>
+                        <div className="border-t pt-1 flex justify-between items-center">
+                          <span className="text-xs font-semibold text-gray-700">Total:</span>
+                          <span className="text-lg font-bold text-purple-600">
+                            {todayTransactions.length}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
                 <div className="bg-gradient-to-br from-yellow-50 to-amber-50 border-2 border-yellow-200 rounded-xl p-4">
                   <div className="flex items-center gap-2 mb-2">
@@ -1022,15 +1487,190 @@ const App = () => {
                     <h4 className="font-semibold text-gray-800">Stock Level</h4>
                   </div>
                   <p className="text-2xl font-bold text-yellow-600">
-                    {purchases.reduce((sum, p) => sum + p.quantity, 0) - sales.reduce((sum, s) => sum + s.quantity, 0)}
+                    {purchases.reduce((sum, p) => sum + p.quantity, 0) - sales.reduce((sum, s) => sum + s.quantity, 0) - mortality.reduce((sum, m) => sum + m.quantity, 0)}
                   </p>
                   <p className="text-sm text-gray-600 mt-1">
-                    {purchases.reduce((sum, p) => sum + p.quantity, 0) - sales.reduce((sum, s) => sum + s.quantity, 0) < 20
+                    {purchases.reduce((sum, p) => sum + p.quantity, 0) - sales.reduce((sum, s) => sum + s.quantity, 0) - mortality.reduce((sum, m) => sum + m.quantity, 0) < 20
                       ? "⚠️ Low stock - reorder soon"
                       : "✓ Stock level good"}
                   </p>
+                  {mortality.reduce((sum, m) => sum + m.quantity, 0) > 0 && (
+                    <p className="text-xs text-red-600 mt-1">
+                      ({mortality.reduce((sum, m) => sum + m.quantity, 0)} lost to mortality)
+                    </p>
+                  )}
                 </div>
               </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  };
+  const HelperMonitoring = () => {
+    const helpers = [
+      { id: "helper-001", name: "Sales Helper 1", email: "helper1@poultry.com" },
+      { id: "helper-002", name: "Sales Helper 2", email: "helper2@poultry.com" },
+    ];
+
+    return (
+      <div className="space-y-6">
+        <div className="bg-gradient-to-r from-purple-600 to-pink-600 rounded-2xl p-6 text-white">
+          <div className="flex items-center gap-3 mb-2">
+            <Users size={32} />
+            <div>
+              <h2 className="text-2xl font-bold">Helper Performance Monitoring</h2>
+              <p className="text-purple-100 text-sm">
+                Track individual helper activities and accountability
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {helpers.map((helper) => {
+            const helperPurchases = purchases.filter((p) => p.recordedBy?.includes("Helper") && p.recordedBy.includes(helper.name.split(" ")[2]));
+            const helperSales = sales.filter((s) => s.soldBy?.includes("Helper") && s.soldBy.includes(helper.name.split(" ")[2]));
+            const helperLoans = loans.filter((l) => l.recordedBy?.includes("Helper") && l.recordedBy.includes(helper.name.split(" ")[2]));
+            const helperExpenses = expenses.filter((e) => e.recordedBy?.includes("Helper") && e.recordedBy.includes(helper.name.split(" ")[2]));
+
+            const totalPurchases = helperPurchases.reduce((sum, p) => sum + (p.totalAmount || 0), 0);
+            const totalSales = helperSales.reduce((sum, s) => sum + (s.totalAmount || 0), 0);
+            const totalExpenses = helperExpenses.reduce((sum, e) => sum + (e.amount || 0), 0);
+
+            return (
+              <div key={helper.id} className="bg-white rounded-2xl shadow-lg p-6">
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="bg-gradient-to-br from-purple-500 to-pink-500 rounded-full p-3">
+                    <User className="text-white" size={24} />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-bold text-gray-800">{helper.name}</h3>
+                    <p className="text-sm text-gray-500">{helper.email}</p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4 mb-6">
+                  <div className="bg-blue-50 rounded-xl p-4">
+                    <p className="text-sm text-gray-600 mb-1">Purchases</p>
+                    <p className="text-2xl font-bold text-blue-600">{helperPurchases.length}</p>
+                    <p className="text-xs text-gray-500 mt-1">₦{totalPurchases.toLocaleString()}</p>
+                  </div>
+                  <div className="bg-green-50 rounded-xl p-4">
+                    <p className="text-sm text-gray-600 mb-1">Sales</p>
+                    <p className="text-2xl font-bold text-green-600">{helperSales.length}</p>
+                    <p className="text-xs text-gray-500 mt-1">₦{totalSales.toLocaleString()}</p>
+                  </div>
+                  <div className="bg-orange-50 rounded-xl p-4">
+                    <p className="text-sm text-gray-600 mb-1">Loans</p>
+                    <p className="text-2xl font-bold text-orange-600">{helperLoans.length}</p>
+                  </div>
+                  <div className="bg-pink-50 rounded-xl p-4">
+                    <p className="text-sm text-gray-600 mb-1">Expenses</p>
+                    <p className="text-2xl font-bold text-pink-600">{helperExpenses.length}</p>
+                    <p className="text-xs text-gray-500 mt-1">₦{totalExpenses.toLocaleString()}</p>
+                  </div>
+                </div>
+
+                <div className="border-t pt-4">
+                  <h4 className="font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                    <Activity size={16} /> Recent Activity
+                  </h4>
+                  <div className="space-y-2">
+                    {[...helperPurchases, ...helperSales, ...helperLoans, ...helperExpenses]
+                      .sort((a, b) => new Date(`${b.date} ${b.time}`) - new Date(`${a.date} ${a.time}`))
+                      .slice(0, 3)
+                      .map((transaction, idx) => (
+                        <div key={idx} className="flex items-center justify-between text-sm bg-gray-50 rounded-lg p-3">
+                          <div className="flex items-center gap-2">
+                            {transaction.supplier ? (
+                              <Package size={14} className="text-blue-600" />
+                            ) : transaction.customerName ? (
+                              <ShoppingCart size={14} className="text-green-600" />
+                            ) : transaction.type ? (
+                              <Wallet size={14} className="text-orange-600" />
+                            ) : (
+                              <CreditCard size={14} className="text-pink-600" />
+                            )}
+                            <span className="text-gray-700">
+                              {transaction.supplier || transaction.customerName || transaction.personName || transaction.description}
+                            </span>
+                          </div>
+                          <span className="font-semibold text-gray-800">
+                            ₦{(transaction.totalAmount || transaction.amount || 0).toLocaleString()}
+                          </span>
+                        </div>
+                      ))}
+                    {[...helperPurchases, ...helperSales, ...helperLoans, ...helperExpenses].length === 0 && (
+                      <p className="text-sm text-gray-500 text-center py-4">No activity yet</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        <div className="bg-white rounded-2xl shadow-lg p-6">
+          <h3 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
+            <Clock size={24} className="text-purple-600" />
+            Complete Transaction Timeline
+          </h3>
+          <div className="space-y-3">
+            {[...purchases, ...sales, ...loans, ...expenses]
+              .sort((a, b) => new Date(`${b.date} ${b.time}`) - new Date(`${a.date} ${a.time}`))
+              .map((transaction, idx) => (
+                <div key={idx} className="flex items-start gap-4 border-l-4 border-purple-500 bg-purple-50 rounded-lg p-4">
+                  <div className="bg-white rounded-full p-2 shadow">
+                    {transaction.supplier ? (
+                      <Package size={20} className="text-blue-600" />
+                    ) : transaction.customerName ? (
+                      <ShoppingCart size={20} className="text-green-600" />
+                    ) : transaction.type ? (
+                      <Wallet size={20} className="text-orange-600" />
+                    ) : (
+                      <CreditCard size={20} className="text-pink-600" />
+                    )}
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex justify-between items-start mb-2">
+                      <div>
+                        <p className="font-semibold text-gray-800">
+                          {transaction.supplier
+                            ? `Purchase from ${transaction.supplier}`
+                            : transaction.customerName
+                            ? `Sale to ${transaction.customerName}`
+                            : transaction.type
+                            ? `${transaction.type === "loan_out" ? "Loan to" : "Payment from"} ${transaction.personName}`
+                            : transaction.description}
+                        </p>
+                        {transaction.notes && (
+                          <p className="text-sm text-gray-600 italic mt-1">{transaction.notes}</p>
+                        )}
+                      </div>
+                      <p className="font-bold text-purple-600">
+                        ₦{(transaction.totalAmount || transaction.amount || 0).toLocaleString()}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-4 text-xs text-gray-500">
+                      <span className="flex items-center gap-1">
+                        <User size={12} />
+                        {transaction.recordedBy || transaction.soldBy}
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <Calendar size={12} />
+                        {transaction.date}
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <Clock size={12} />
+                        {transaction.time}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            {[...purchases, ...sales, ...loans, ...expenses].length === 0 && (
+              <p className="text-center text-gray-500 py-8">No transactions yet</p>
             )}
           </div>
         </div>
@@ -1096,6 +1736,7 @@ const App = () => {
                   <th className="px-4 py-4 text-left text-xs font-bold text-gray-700 uppercase">Unit Price</th>
                   <th className="px-4 py-4 text-left text-xs font-bold text-gray-700 uppercase">Total Amount</th>
                   <th className="px-4 py-4 text-left text-xs font-bold text-gray-700 uppercase">Payment</th>
+                  <th className="px-4 py-4 text-left text-xs font-bold text-gray-700 uppercase">Status</th>
                   <th className="px-4 py-4 text-left text-xs font-bold text-gray-700 uppercase">Recorded By</th>
                   <th className="px-4 py-4 text-left text-xs font-bold text-gray-700 uppercase">Notes</th>
                 </tr>
@@ -1132,10 +1773,21 @@ const App = () => {
                       <span className="bg-purple-100 text-purple-700 px-3 py-1 rounded-full text-xs font-semibold">
                         {purchase.paymentMode}
                       </span>
-                      <button className="flex items-center gap-1 text-green-600 hover:text-green-700 text-xs mt-1">
-                        <CheckCircle size={12} />
-                        <span>Proof</span>
-                      </button>
+                      {purchase.paymentProof && (
+                        <button className="flex items-center gap-1 text-green-600 hover:text-green-700 text-xs mt-1">
+                          <CheckCircle size={12} />
+                          <span>Proof</span>
+                        </button>
+                      )}
+                    </td>
+                    <td className="px-4 py-4">
+                      <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                        purchase.payment_status === "Credit" 
+                          ? "bg-orange-100 text-orange-700" 
+                          : "bg-green-100 text-green-700"
+                      }`}>
+                        {purchase.payment_status === "Credit" ? "📝 On Credit" : "✅ Paid"}
+                      </span>
                     </td>
                     <td className="px-4 py-4">
                       <div className="flex items-center gap-2">
@@ -1508,6 +2160,7 @@ const App = () => {
               </div>
               <button
                 onClick={() => {
+                  localStorage.removeItem('currentUser'); // Clear saved session
                   setCurrentUser(null);
                   setShowLoginModal(true);
                   setActiveTab("dashboard");
@@ -1582,18 +2235,14 @@ const App = () => {
         {activeTab === "purchases" && <PurchasesList />}
         {activeTab === "sales" && <SalesList />}
         {activeTab === "loans-expenses" && <LoansExpensesTab />}
-        {activeTab === "monitoring" && isAdmin && (
-          <div className="bg-white rounded-2xl shadow-lg p-6">
-            <h2 className="text-2xl font-bold mb-4">Helper Monitoring</h2>
-            <p className="text-gray-600">Helper performance metrics and detailed monitoring will appear here</p>
-          </div>
-        )}
+        {activeTab === "monitoring" && isAdmin && <HelperMonitoring />}
       </div>
 
       {showPurchaseForm && <PurchaseForm />}
       {showSalesForm && <SalesForm />}
       {showLoanForm && <LoanForm />}
       {showExpenseForm && <ExpenseForm />}
+      {showMortalityForm && <MortalityForm />}
     </div>
   );
 };
