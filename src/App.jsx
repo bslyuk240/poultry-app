@@ -44,62 +44,169 @@ const App = () => {
   const [showMortalityForm, setShowMortalityForm] = useState(false);
   const [mortality, setMortality] = useState([]);
   React.useEffect(() => {
-    const savedUser = localStorage.getItem('currentUser');
-    if (savedUser) {
-      const user = JSON.parse(savedUser);
-      setCurrentUser(user);
-      setShowLoginModal(false);
-      loadMockData();
-    }
-  }, []);
+    // Check if user is already logged in
+    const checkUser = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (session) {
+        // User is logged in, get their profile
+        const { data: userData, error } = await supabase
+          .from('users')
+          .select('*')
+          .eq('id', session.user.id)
+          .single();
 
-  const LoginModal = () => {
-    const [email, setEmail] = useState("");
-    const [password, setPassword] = useState("");
-    const [userType, setUserType] = useState("admin");
-
-    const handleLogin = async () => {
-      if (email && password) {
-        try {
-          // Check if user exists in database
-          const { data: userData, error } = await supabase
-            .from('users')
-            .select('*')
-            .eq('email', email)
-            .single();
-
-          if (error || !userData) {
-            alert('Invalid credentials or user not found');
-            return;
-          }
-
-          // Check role matches
-          if (userData.role !== userType) {
-            alert(`This email is registered as ${userData.role}, not ${userType}`);
-            return;
-          }
-
+        if (userData) {
           setCurrentUser({
             id: userData.id,
             email: userData.email,
             role: userData.role,
             name: userData.name,
           });
-          
-          // Save to localStorage for persistence
           localStorage.setItem('currentUser', JSON.stringify({
             id: userData.id,
             email: userData.email,
             role: userData.role,
             name: userData.name,
           }));
-          
           setShowLoginModal(false);
           loadMockData();
-        } catch (error) {
-          console.error('Login error:', error);
-          alert('Login failed. Please try again.');
         }
+      }
+    };
+
+    checkUser();
+
+    // Listen for auth changes
+    const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === 'SIGNED_OUT') {
+        setCurrentUser(null);
+        localStorage.removeItem('currentUser');
+        setShowLoginModal(true);
+      }
+    });
+
+    return () => {
+      authListener?.subscription?.unsubscribe();
+    };
+  }, []);
+
+  const LoginModal = () => {
+    const [email, setEmail] = useState("");
+    const [password, setPassword] = useState("");
+    const [loading, setLoading] = useState(false);
+    const [isSignUp, setIsSignUp] = useState(false);
+    const [signUpData, setSignUpData] = useState({
+      name: "",
+      email: "",
+      password: "",
+      confirmPassword: "",
+      role: "helper"
+    });
+
+    const handleLogin = async () => {
+      if (!email || !password) {
+        alert('Please enter email and password');
+        return;
+      }
+
+      setLoading(true);
+      try {
+        // Sign in with Supabase Auth
+        const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+          email: email,
+          password: password,
+        });
+
+        if (authError) {
+          alert('Login failed: ' + authError.message);
+          setLoading(false);
+          return;
+        }
+
+        // Get user profile from users table
+        const { data: userData, error: userError } = await supabase
+          .from('users')
+          .select('*')
+          .eq('id', authData.user.id)
+          .single();
+
+        if (userError || !userData) {
+          alert('User profile not found');
+          await supabase.auth.signOut();
+          setLoading(false);
+          return;
+        }
+
+        setCurrentUser({
+          id: userData.id,
+          email: userData.email,
+          role: userData.role,
+          name: userData.name,
+        });
+        
+        localStorage.setItem('currentUser', JSON.stringify({
+          id: userData.id,
+          email: userData.email,
+          role: userData.role,
+          name: userData.name,
+        }));
+        
+        setShowLoginModal(false);
+        loadMockData();
+        setLoading(false);
+      } catch (error) {
+        console.error('Login error:', error);
+        alert('Login failed. Please try again.');
+        setLoading(false);
+      }
+    };
+
+    const handleSignUp = async () => {
+      if (!signUpData.name || !signUpData.email || !signUpData.password) {
+        alert('Please fill in all fields');
+        return;
+      }
+
+      if (signUpData.password !== signUpData.confirmPassword) {
+        alert('Passwords do not match');
+        return;
+      }
+
+      if (signUpData.password.length < 6) {
+        alert('Password must be at least 6 characters');
+        return;
+      }
+
+      setLoading(true);
+      try {
+        // Sign up with Supabase Auth
+        const { data: authData, error: authError } = await supabase.auth.signUp({
+          email: signUpData.email,
+          password: signUpData.password,
+          options: {
+            data: {
+              name: signUpData.name,
+              role: signUpData.role
+            }
+          }
+        });
+
+        if (authError) {
+          alert('Sign up failed: ' + authError.message);
+          setLoading(false);
+          return;
+        }
+
+        alert('Account created successfully! Please log in.');
+        setIsSignUp(false);
+        setEmail(signUpData.email);
+        setSignUpData({ name: "", email: "", password: "", confirmPassword: "", role: "helper" });
+        setLoading(false);
+      } catch (error) {
+        console.error('Sign up error:', error);
+        alert('Sign up failed. Please try again.');
+        setLoading(false);
       }
     };
 
@@ -111,65 +218,126 @@ const App = () => {
               <User className="text-white" size={32} />
             </div>
             <h2 className="text-3xl font-bold text-gray-800">Poultry Business</h2>
-            <p className="text-gray-500 mt-2">Sign in to continue</p>
+            <p className="text-gray-500 mt-2">{isSignUp ? 'Create new account' : 'Sign in to continue'}</p>
           </div>
 
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">Select Your Role</label>
-              <select
-                className="w-full p-3 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:outline-none transition"
-                value={userType}
-                onChange={(e) => setUserType(e.target.value)}
+          {!isSignUp ? (
+            // LOGIN FORM
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Email Address</label>
+                <input
+                  type="email"
+                  className="w-full p-3 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:outline-none transition"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="your@email.com"
+                  disabled={loading}
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Password</label>
+                <input
+                  type="password"
+                  className="w-full p-3 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:outline-none transition"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Enter your password"
+                  disabled={loading}
+                  onKeyPress={(e) => e.key === 'Enter' && handleLogin()}
+                />
+              </div>
+
+              <button
+                onClick={handleLogin}
+                disabled={loading}
+                className="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white py-3 rounded-xl font-semibold hover:shadow-lg transform hover:scale-105 transition disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <option value="admin">👤 Admin (Monitor Only)</option>
-                <option value="helper">👥 Sales Helper (Make Transactions)</option>
-              </select>
-            </div>
+                {loading ? 'Signing in...' : 'Sign In'}
+              </button>
 
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">Email Address</label>
-              <input
-                type="email"
-                className="w-full p-3 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:outline-none transition"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="your@email.com"
-              />
+              <div className="text-center mt-4">
+                <button
+                  onClick={() => setIsSignUp(true)}
+                  className="text-blue-600 hover:text-blue-700 text-sm font-semibold"
+                >
+                  Don't have an account? Sign up
+                </button>
+              </div>
             </div>
+          ) : (
+            // SIGNUP FORM
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Full Name</label>
+                <input
+                  type="text"
+                  className="w-full p-3 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:outline-none transition"
+                  value={signUpData.name}
+                  onChange={(e) => setSignUpData({ ...signUpData, name: e.target.value })}
+                  placeholder="Your full name"
+                  disabled={loading}
+                />
+              </div>
 
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">Password</label>
-              <input
-                type="password"
-                className="w-full p-3 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:outline-none transition"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="Enter your password"
-              />
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Email Address</label>
+                <input
+                  type="email"
+                  className="w-full p-3 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:outline-none transition"
+                  value={signUpData.email}
+                  onChange={(e) => setSignUpData({ ...signUpData, email: e.target.value })}
+                  placeholder="your@email.com"
+                  disabled={loading}
+                />
+              </div>
+
+              {/* Role is automatically set to helper - no selection needed */}
+              <input type="hidden" value="helper" />
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Password</label>
+                <input
+                  type="password"
+                  className="w-full p-3 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:outline-none transition"
+                  value={signUpData.password}
+                  onChange={(e) => setSignUpData({ ...signUpData, password: e.target.value })}
+                  placeholder="At least 6 characters"
+                  disabled={loading}
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Confirm Password</label>
+                <input
+                  type="password"
+                  className="w-full p-3 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:outline-none transition"
+                  value={signUpData.confirmPassword}
+                  onChange={(e) => setSignUpData({ ...signUpData, confirmPassword: e.target.value })}
+                  placeholder="Re-enter password"
+                  disabled={loading}
+                />
+              </div>
+
+              <button
+                onClick={handleSignUp}
+                disabled={loading}
+                className="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white py-3 rounded-xl font-semibold hover:shadow-lg transform hover:scale-105 transition disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {loading ? 'Creating account...' : 'Create Account'}
+              </button>
+
+              <div className="text-center mt-4">
+                <button
+                  onClick={() => setIsSignUp(false)}
+                  className="text-blue-600 hover:text-blue-700 text-sm font-semibold"
+                >
+                  Already have an account? Sign in
+                </button>
+              </div>
             </div>
-
-            <button
-              onClick={handleLogin}
-              className="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white py-3 rounded-xl font-semibold hover:shadow-lg transform hover:scale-105 transition"
-            >
-              Sign In
-            </button>
-
-            <div className="mt-6 p-4 bg-blue-50 rounded-xl border border-blue-200">
-              <p className="text-xs text-blue-800 text-center">
-                {userType === "admin" ? (
-                  <>
-                    <strong>Admin:</strong> Monitor all activities, view reports, track helper performance
-                  </>
-                ) : (
-                  <>
-                    <strong>Helper:</strong> Record purchases & sales, manage daily transactions
-                  </>
-                )}
-              </p>
-            </div>
-          </div>
+          )}
         </div>
       </div>
     );
@@ -1508,10 +1676,24 @@ const App = () => {
     );
   };
   const HelperMonitoring = () => {
-    const helpers = [
-      { id: "helper-001", name: "Sales Helper 1", email: "helper1@poultry.com" },
-      { id: "helper-002", name: "Sales Helper 2", email: "helper2@poultry.com" },
-    ];
+    // Get real helpers from the database
+    const [helpers, setHelpers] = React.useState([]);
+
+    React.useEffect(() => {
+      const loadHelpers = async () => {
+        const { data, error } = await supabase
+          .from('users')
+          .select('*')
+          .eq('role', 'helper')
+          .order('created_at', { ascending: false });
+
+        if (!error && data) {
+          setHelpers(data);
+        }
+      };
+
+      loadHelpers();
+    }, []);
 
     return (
       <div className="space-y-6">
@@ -1529,10 +1711,10 @@ const App = () => {
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {helpers.map((helper) => {
-            const helperPurchases = purchases.filter((p) => p.recordedBy?.includes("Helper") && p.recordedBy.includes(helper.name.split(" ")[2]));
-            const helperSales = sales.filter((s) => s.soldBy?.includes("Helper") && s.soldBy.includes(helper.name.split(" ")[2]));
-            const helperLoans = loans.filter((l) => l.recordedBy?.includes("Helper") && l.recordedBy.includes(helper.name.split(" ")[2]));
-            const helperExpenses = expenses.filter((e) => e.recordedBy?.includes("Helper") && e.recordedBy.includes(helper.name.split(" ")[2]));
+            const helperPurchases = purchases.filter((p) => p.recordedById === helper.id);
+            const helperSales = sales.filter((s) => s.soldById === helper.id);
+            const helperLoans = loans.filter((l) => l.recordedById === helper.id);
+            const helperExpenses = expenses.filter((e) => e.recordedById === helper.id);
 
             const totalPurchases = helperPurchases.reduce((sum, p) => sum + (p.totalAmount || 0), 0);
             const totalSales = helperSales.reduce((sum, s) => sum + (s.totalAmount || 0), 0);
@@ -1674,6 +1856,14 @@ const App = () => {
             )}
           </div>
         </div>
+
+        {helpers.length === 0 && (
+          <div className="bg-white rounded-2xl shadow-lg p-12 text-center">
+            <Users className="mx-auto text-gray-300 mb-4" size={64} />
+            <h3 className="text-xl font-bold text-gray-800 mb-2">No Helpers Yet</h3>
+            <p className="text-gray-600">Create helper accounts and their activities will appear here.</p>
+          </div>
+        )}
       </div>
     );
   };
@@ -2159,8 +2349,9 @@ const App = () => {
                 <p className="text-xs text-gray-500">{isAdmin ? "👤 Admin" : "👥 Sales Helper"}</p>
               </div>
               <button
-                onClick={() => {
-                  localStorage.removeItem('currentUser'); // Clear saved session
+                onClick={async () => {
+                  await supabase.auth.signOut();
+                  localStorage.removeItem('currentUser');
                   setCurrentUser(null);
                   setShowLoginModal(true);
                   setActiveTab("dashboard");
