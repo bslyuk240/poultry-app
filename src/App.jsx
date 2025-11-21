@@ -27,6 +27,7 @@ import {
   ArrowUpCircle,
   ArrowDownCircle,
   Trash,
+  Menu,
 } from "lucide-react";
 import { supabase } from './supabaseClient';
 
@@ -44,6 +45,7 @@ const App = () => {
   const [showExpenseForm, setShowExpenseForm] = useState(false);
   const [showMortalityForm, setShowMortalityForm] = useState(false);
   const [mortality, setMortality] = useState([]);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   React.useEffect(() => {
     // Check if user is already logged in
     const checkUser = async () => {
@@ -51,7 +53,7 @@ const App = () => {
       
       if (session) {
         // User is logged in, get their profile
-        const { data: userData, error } = await supabase
+        const { data: userData, error: _userError } = await supabase
           .from('users')
           .select('*')
           .eq('id', session.user.id)
@@ -79,7 +81,7 @@ const App = () => {
     checkUser();
 
     // Listen for auth changes
-    const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
+    const { data: authListener } = supabase.auth.onAuthStateChange(async (event) => {
       if (event === 'SIGNED_OUT') {
         setCurrentUser(null);
         localStorage.removeItem('currentUser');
@@ -182,7 +184,7 @@ const App = () => {
       setLoading(true);
       try {
         // Sign up with Supabase Auth
-        const { data: authData, error: authError } = await supabase.auth.signUp({
+        const { data: _authData, error: authError } = await supabase.auth.signUp({
           email: signUpData.email,
           password: signUpData.password,
           options: {
@@ -436,15 +438,33 @@ const App = () => {
     const confirmed = window.confirm(`Delete this ${label}? This cannot be undone.`);
     if (!confirmed) return;
 
-    const { error } = await supabase.from(table).delete().eq('id', id);
+    try {
+      const { error } = await supabase.from(table).delete().eq('id', id).select();
 
-    if (error) {
-      console.error(`Error deleting ${label}:`, error);
+      if (error) {
+        console.error(`Error deleting ${label}:`, error);
+        alert(`Could not delete ${label}. ${error.message || "Please try again."}`);
+        return;
+      }
+
+      // Remove locally so UI updates immediately even before reload
+      if (table === 'purchases') {
+        setPurchases((prev) => prev.filter((item) => item.id !== id));
+      } else if (table === 'sales') {
+        setSales((prev) => prev.filter((item) => item.id !== id));
+      } else if (table === 'loans') {
+        setLoans((prev) => prev.filter((item) => item.id !== id));
+      } else if (table === 'expenses') {
+        setExpenses((prev) => prev.filter((item) => item.id !== id));
+      } else if (table === 'mortality') {
+        setMortality((prev) => prev.filter((item) => item.id !== id));
+      }
+
+      await loadMockData();
+    } catch (err) {
+      console.error(`Unexpected error deleting ${label}:`, err);
       alert(`Could not delete ${label}. Please try again.`);
-      return;
     }
-
-    await loadMockData();
   };
 
 /* ========== END OF PART 1 ========== */
@@ -485,7 +505,7 @@ const App = () => {
           recorded_by_id: currentUser.id,
         };
 
-        const { data, error } = await supabase
+        const { data: _data, error } = await supabase
           .from('purchases')
           .insert([newPurchase])
           .select();
@@ -691,7 +711,7 @@ const App = () => {
           sold_by_id: currentUser.id,
         };
 
-        const { data, error } = await supabase
+        const { data: _data, error } = await supabase
           .from('sales')
           .insert([newSale])
           .select();
@@ -861,7 +881,7 @@ const App = () => {
             recorded_by_id: currentUser.id,
           };
 
-          const { data: paybackData, error: paybackError } = await supabase
+          const { data: _paybackData, error: paybackError } = await supabase
             .from('loans')
             .insert([newPayback])
             .select();
@@ -899,7 +919,7 @@ const App = () => {
             recorded_by_id: currentUser.id,
           };
 
-          const { data, error } = await supabase
+          const { data: _data, error } = await supabase
             .from('loans')
             .insert([newLoan])
             .select();
@@ -1065,7 +1085,7 @@ const App = () => {
           recorded_by_id: currentUser.id,
         };
 
-        const { data, error } = await supabase
+        const { data: _data, error } = await supabase
           .from('expenses')
           .insert([newExpense])
           .select();
@@ -1191,7 +1211,7 @@ const App = () => {
           recorded_by_id: currentUser.id,
         };
 
-        const { data, error } = await supabase
+        const { data: _data, error } = await supabase
           .from('mortality')
           .insert([newMortality])
           .select();
@@ -1344,7 +1364,7 @@ const App = () => {
           </div>
         )}
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
           <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl p-6 text-white shadow-lg">
             <div className="flex items-center justify-between mb-4">
               <Package size={32} />
@@ -1389,7 +1409,7 @@ const App = () => {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-2 md:grid-cols-2 gap-4 sm:gap-6">
           <div className="bg-gradient-to-br from-pink-100 to-rose-100 rounded-2xl p-6 border-2 border-pink-200">
             <div className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-2">
@@ -1414,7 +1434,7 @@ const App = () => {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-2 md:grid-cols-2 gap-4 sm:gap-6">
           <div className="bg-gradient-to-br from-blue-100 to-cyan-100 rounded-2xl p-6 border-2 border-blue-200">
             <div className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-2">
@@ -1934,7 +1954,68 @@ const App = () => {
             )}
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <>
+          <div className="md:hidden grid grid-cols-1 gap-3">
+            {purchases.map((purchase) => (
+              <div key={purchase.id} className="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <p className="text-sm font-semibold text-gray-800">{purchase.supplier}</p>
+                    <p className="text-xs text-gray-500">{purchase.contact}</p>
+                    <p className="text-xs text-gray-500 mt-1">{purchase.date} • {purchase.time}</p>
+                  </div>
+                  {isAdmin && (
+                    <button
+                      onClick={() => handleDelete('purchases', purchase.id, 'purchase record')}
+                      className="flex items-center gap-1 text-red-600 hover:text-red-700 text-xs font-semibold bg-red-50 border border-red-200 px-2 py-1 rounded-lg"
+                    >
+                      <Trash size={14} />
+                      Delete
+                    </button>
+                  )}
+                </div>
+                <div className="grid grid-cols-2 gap-2 text-xs text-gray-700 mt-3">
+                  <div className="rounded-lg bg-blue-50 px-3 py-2">
+                    <p className="text-xs text-gray-500">Quantity</p>
+                    <p className="font-semibold text-gray-800">{purchase.quantity} birds</p>
+                  </div>
+                  <div className="rounded-lg bg-purple-50 px-3 py-2">
+                    <p className="text-xs text-gray-500">Payment</p>
+                    <p className="font-semibold text-gray-800">{purchase.paymentMode}</p>
+                  </div>
+                  <div className="rounded-lg bg-gray-50 px-3 py-2">
+                    <p className="text-xs text-gray-500">Unit Price</p>
+                    <p className="font-semibold text-gray-800">NGN {purchase.unitPrice?.toLocaleString()}</p>
+                  </div>
+                  <div className="rounded-lg bg-gray-50 px-3 py-2">
+                    <p className="text-xs text-gray-500">Total</p>
+                    <p className="font-semibold text-gray-800">NGN {purchase.totalAmount?.toLocaleString()}</p>
+                  </div>
+                  <div className="rounded-lg bg-green-50 px-3 py-2 col-span-2">
+                    <p className="text-xs text-gray-500">Status</p>
+                    <p className={`text-sm font-semibold ${
+                      purchase.payment_status === "Credit" ? "text-orange-700" : "text-green-700"
+                    }`}>
+                      {purchase.payment_status === "Credit" ? "On Credit" : "Paid"}
+                    </p>
+                  </div>
+                </div>
+                {purchase.notes && (
+                  <p className="text-xs text-gray-600 mt-3 border-t pt-2">{purchase.notes}</p>
+                )}
+                <div className="flex items-center gap-2 mt-3 text-xs text-gray-600">
+                  <User size={14} />
+                  <span>{purchase.recordedBy}</span>
+                  {purchase.paymentProof && (
+                    <span className="ml-auto inline-flex items-center gap-1 text-green-700 bg-green-50 px-2 py-1 rounded">
+                      <CheckCircle size={12} /> Proof
+                    </span>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="hidden md:block overflow-x-auto">
             <table className="w-full">
               <thead>
                 <tr className="bg-gradient-to-r from-blue-50 to-purple-50 border-b-2 border-blue-200">
@@ -2031,6 +2112,7 @@ const App = () => {
               </tbody>
             </table>
           </div>
+          </>
         )}
       </div>
     );
@@ -2081,7 +2163,54 @@ const App = () => {
             )}
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <>
+          <div className="md:hidden grid grid-cols-1 gap-3">
+            {sales.map((sale) => (
+              <div key={sale.id} className="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <p className="text-sm font-semibold text-gray-800">{sale.customerName}</p>
+                    <p className="text-xs text-gray-500 mt-1">{sale.date} • {sale.time}</p>
+                  </div>
+                  {isAdmin && (
+                    <button
+                      onClick={() => handleDelete('sales', sale.id, 'sale record')}
+                      className="flex items-center gap-1 text-red-600 hover:text-red-700 text-xs font-semibold bg-red-50 border border-red-200 px-2 py-1 rounded-lg"
+                    >
+                      <Trash size={14} />
+                      Delete
+                    </button>
+                  )}
+                </div>
+                <div className="grid grid-cols-2 gap-2 text-xs text-gray-700 mt-3">
+                  <div className="rounded-lg bg-green-50 px-3 py-2">
+                    <p className="text-xs text-gray-500">Quantity</p>
+                    <p className="font-semibold text-gray-800">{sale.quantity} birds</p>
+                  </div>
+                  <div className="rounded-lg bg-emerald-50 px-3 py-2">
+                    <p className="text-xs text-gray-500">Payment</p>
+                    <p className="font-semibold text-gray-800">{sale.paymentMode}</p>
+                  </div>
+                  <div className="rounded-lg bg-gray-50 px-3 py-2">
+                    <p className="text-xs text-gray-500">Unit Price</p>
+                    <p className="font-semibold text-gray-800">NGN {sale.unitPrice?.toLocaleString()}</p>
+                  </div>
+                  <div className="rounded-lg bg-gray-50 px-3 py-2">
+                    <p className="text-xs text-gray-500">Total</p>
+                    <p className="font-semibold text-gray-800">NGN {sale.totalAmount?.toLocaleString()}</p>
+                  </div>
+                </div>
+                {sale.notes && (
+                  <p className="text-xs text-gray-600 mt-3 border-t pt-2">{sale.notes}</p>
+                )}
+                <div className="flex items-center gap-2 mt-3 text-xs text-gray-600">
+                  <User size={14} />
+                  <span>{sale.soldBy}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="hidden md:block overflow-x-auto">
             <table className="w-full">
               <thead>
                 <tr className="bg-gradient-to-r from-green-50 to-emerald-50 border-b-2 border-green-200">
@@ -2161,6 +2290,7 @@ const App = () => {
               </tbody>
             </table>
           </div>
+          </>
         )}
       </div>
     );
@@ -2200,7 +2330,54 @@ const App = () => {
               <p className="text-gray-500">No loan transactions yet</p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
+            <>
+              <div className="md:hidden grid grid-cols-1 gap-3">
+                {loans.map((loan) => (
+                  <div key={loan.id} className="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <p className="text-sm font-semibold text-gray-800">{loan.personName}</p>
+                        <p className="text-xs text-gray-500 mt-1">{loan.date} • {loan.time}</p>
+                        {loan.dueDate && <p className="text-xs text-orange-600 mt-1">Due: {loan.dueDate}</p>}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className={`text-xs font-semibold px-2 py-1 rounded-full ${loan.type === "loan_out" ? "bg-red-100 text-red-700" : "bg-green-100 text-green-700"}`}>
+                          {loan.type === "loan_out" ? "Loan Out" : "Pay Back"}
+                        </span>
+                        {isAdmin && (
+                          <button
+                            onClick={() => handleDelete('loans', loan.id, 'loan entry')}
+                            className="flex items-center gap-1 text-red-600 hover:text-red-700 text-xs font-semibold bg-red-50 border border-red-200 px-2 py-1 rounded-lg"
+                          >
+                            <Trash size={14} />
+                            Delete
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 text-xs text-gray-700 mt-3">
+                      <div className="rounded-lg bg-orange-50 px-3 py-2 col-span-2">
+                        <p className="text-xs text-gray-500">Amount</p>
+                        <p className="font-semibold text-gray-800">NGN {loan.amount?.toLocaleString()}</p>
+                      </div>
+                      <div className="rounded-lg bg-gray-50 px-3 py-2">
+                        <p className="text-xs text-gray-500">Status</p>
+                        <p className={`font-semibold ${loan.status === "pending" ? "text-yellow-700" : "text-green-700"}`}>
+                          {loan.status === "pending" ? "Pending" : "Completed"}
+                        </p>
+                      </div>
+                      <div className="rounded-lg bg-gray-50 px-3 py-2">
+                        <p className="text-xs text-gray-500">Recorded By</p>
+                        <p className="font-semibold text-gray-800">{loan.recordedBy}</p>
+                      </div>
+                    </div>
+                    {loan.notes && (
+                      <p className="text-xs text-gray-600 mt-3 border-t pt-2">{loan.notes}</p>
+                    )}
+                  </div>
+                ))}
+              </div>
+              <div className="hidden md:block overflow-x-auto">
               <table className="w-full">
                 <thead>
                   <tr className="bg-gradient-to-r from-orange-50 to-red-50 border-b-2 border-orange-200">
@@ -2288,6 +2465,7 @@ const App = () => {
                 </tbody>
               </table>
             </div>
+            </>
           )}
         </div>
 
@@ -2320,7 +2498,48 @@ const App = () => {
               <p className="text-gray-500">No expenses recorded yet</p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
+            <>
+            <div className="md:hidden grid grid-cols-1 gap-3">
+              {expenses.map((expense) => (
+                <div key={expense.id} className="bg-white border border-gray-200 rounded-xl shadow-sm p-4">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <p className="text-sm font-semibold text-gray-800">{expense.description}</p>
+                      <p className="text-xs text-gray-500 mt-1">{expense.date} • {expense.time}</p>
+                      <span className="inline-flex items-center text-[11px] px-2 py-1 rounded-full bg-pink-50 text-pink-700 font-semibold mt-2">
+                        {expense.category}
+                      </span>
+                    </div>
+                    {isAdmin && (
+                      <button
+                        onClick={() => handleDelete('expenses', expense.id, 'expense record')}
+                        className="flex items-center gap-1 text-red-600 hover:text-red-700 text-xs font-semibold bg-red-50 border border-red-200 px-2 py-1 rounded-lg"
+                      >
+                        <Trash size={14} />
+                        Delete
+                      </button>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 text-xs text-gray-700 mt-3">
+                    <div className="rounded-lg bg-rose-50 px-3 py-2 col-span-2">
+                      <p className="text-xs text-gray-500">Amount</p>
+                      <p className="font-semibold text-gray-800">NGN {expense.amount?.toLocaleString()}</p>
+                    </div>
+                    <div className="rounded-lg bg-gray-50 px-3 py-2">
+                      <p className="text-xs text-gray-500">Recorded By</p>
+                      <p className="font-semibold text-gray-800">{expense.recordedBy}</p>
+                    </div>
+                    {expense.notes && (
+                      <div className="rounded-lg bg-gray-50 px-3 py-2 col-span-2">
+                        <p className="text-xs text-gray-500">Notes</p>
+                        <p className="text-xs text-gray-700">{expense.notes}</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="hidden md:block overflow-x-auto">
               <table className="w-full">
                 <thead>
                   <tr className="bg-gradient-to-r from-pink-50 to-rose-50 border-b-2 border-pink-200">
@@ -2390,6 +2609,7 @@ const App = () => {
                 </tbody>
               </table>
             </div>
+            </>
           )}
         </div>
       </div>
@@ -2402,13 +2622,66 @@ const App = () => {
   if (showLoginModal) return <LoginModal />;
 
   const isAdmin = currentUser.role === "admin";
+  const navLinks = [
+    { key: "dashboard", label: "Dashboard", icon: Home },
+    { key: "purchases", label: "Purchases", icon: Package },
+    { key: "sales", label: "Sales", icon: ShoppingCart },
+    { key: "loans-expenses", label: "Loans & Expenses", icon: Wallet },
+  ];
+  if (isAdmin) {
+    navLinks.push({ key: "monitoring", label: "Helper Monitoring", icon: Users });
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
+      {mobileMenuOpen && (
+        <div className="fixed inset-0 z-50 md:hidden">
+          <div
+            className="absolute inset-0 bg-black/40"
+            onClick={() => setMobileMenuOpen(false)}
+          />
+          <div className="absolute left-0 top-0 h-full w-72 bg-white shadow-2xl p-5 flex flex-col gap-4">
+            <div className="flex items-center justify-between">
+              <p className="text-lg font-bold text-gray-800">Menu</p>
+              <button
+                onClick={() => setMobileMenuOpen(false)}
+                className="p-2 rounded-lg hover:bg-gray-100"
+              >
+                <X size={20} />
+              </button>
+            </div>
+            <div className="space-y-2">
+              {navLinks.map((link) => (
+                <button
+                  key={link.key}
+                  onClick={() => {
+                    setActiveTab(link.key);
+                    setMobileMenuOpen(false);
+                  }}
+                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold border transition ${
+                    activeTab === link.key
+                      ? "bg-gradient-to-r from-blue-600 to-purple-600 text-white border-transparent"
+                      : "bg-white text-gray-800 border-gray-200 hover:border-blue-200"
+                  }`}
+                >
+                  <link.icon size={18} />
+                  <span>{link.label}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
       <nav className="bg-white shadow-md sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center gap-3">
+              <button
+                className="md:hidden p-2 rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 transition"
+                onClick={() => setMobileMenuOpen(true)}
+              >
+                <Menu size={22} />
+              </button>
               <div className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-full p-2">
                 <Home className="text-white" size={24} />
               </div>
@@ -2441,59 +2714,37 @@ const App = () => {
       </nav>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="flex gap-3 mb-8 overflow-x-auto pb-2">
-          <button
-            onClick={() => setActiveTab("dashboard")}
-            className={`flex items-center gap-2 px-6 py-3 rounded-xl font-semibold whitespace-nowrap transition transform hover:scale-105 ${
-              activeTab === "dashboard"
-                ? "bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-lg"
-                : "bg-white text-gray-700 hover:bg-gray-50 shadow"
-            }`}
-          >
-            <Home size={20} /> Dashboard
-          </button>
-          <button
-            onClick={() => setActiveTab("purchases")}
-            className={`flex items-center gap-2 px-6 py-3 rounded-xl font-semibold whitespace-nowrap transition transform hover:scale-105 ${
-              activeTab === "purchases"
-                ? "bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-lg"
-                : "bg-white text-gray-700 hover:bg-gray-50 shadow"
-            }`}
-          >
-            <Package size={20} /> Purchases {isAdmin && "(Admin)"}
-          </button>
-          <button
-            onClick={() => setActiveTab("sales")}
-            className={`flex items-center gap-2 px-6 py-3 rounded-xl font-semibold whitespace-nowrap transition transform hover:scale-105 ${
-              activeTab === "sales"
-                ? "bg-gradient-to-r from-green-600 to-emerald-600 text-white shadow-lg"
-                : "bg-white text-gray-700 hover:bg-gray-50 shadow"
-            }`}
-          >
-            <ShoppingCart size={20} /> Sales {isAdmin && "(Admin)"}
-          </button>
-          <button
-            onClick={() => setActiveTab("loans-expenses")}
-            className={`flex items-center gap-2 px-6 py-3 rounded-xl font-semibold whitespace-nowrap transition transform hover:scale-105 ${
-              activeTab === "loans-expenses"
-                ? "bg-gradient-to-r from-orange-600 to-pink-600 text-white shadow-lg"
-                : "bg-white text-gray-700 hover:bg-gray-50 shadow"
-            }`}
-          >
-            <Wallet size={20} /> Loans & Expenses {isAdmin && "(Admin)"}
-          </button>
-          {isAdmin && (
+        <div className="hidden md:flex flex-wrap gap-3 mb-8">
+          {navLinks.map((link) => (
             <button
-              onClick={() => setActiveTab("monitoring")}
-              className={`flex items-center gap-2 px-6 py-3 rounded-xl font-semibold whitespace-nowrap transition transform hover:scale-105 ${
-                activeTab === "monitoring"
-                  ? "bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-lg"
+              key={link.key}
+              onClick={() => setActiveTab(link.key)}
+              className={`flex items-center gap-2 px-6 py-3 rounded-xl font-semibold whitespace-nowrap transition ${
+                activeTab === link.key
+                  ? "bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-lg"
                   : "bg-white text-gray-700 hover:bg-gray-50 shadow"
               }`}
             >
-              <Users size={20} /> Helper Monitoring
+              <link.icon size={20} /> {link.label} {isAdmin && link.key !== "dashboard" && link.key !== "monitoring" && "(Admin)"}
             </button>
-          )}
+          ))}
+        </div>
+
+        <div className="md:hidden grid grid-cols-2 gap-3 mb-6">
+          {navLinks.map((link) => (
+            <button
+              key={link.key}
+              onClick={() => setActiveTab(link.key)}
+              className={`flex items-center gap-2 px-4 py-3 rounded-xl text-sm font-semibold transition border ${
+                activeTab === link.key
+                  ? "bg-gradient-to-r from-blue-600 to-purple-600 text-white border-transparent"
+                  : "bg-white text-gray-700 border-gray-200"
+              }`}
+            >
+              <link.icon size={18} />
+              <span className="text-left">{link.label}</span>
+            </button>
+          ))}
         </div>
 
         {activeTab === "dashboard" && <Dashboard />}
