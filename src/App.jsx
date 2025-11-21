@@ -1370,9 +1370,9 @@ const App = () => {
               <Package size={32} />
               <div className="bg-white/20 rounded-full px-3 py-1 text-xs font-semibold">Purchases</div>
             </div>
-            <p className="text-3xl font-bold mb-1">{userPurchases.length}</p>
-            <p className="text-blue-100 text-sm mb-2">Total Transactions</p>
-            <p className="text-lg font-semibold">₦{totalPurchaseAmount.toLocaleString()}</p>
+            <p className="text-2xl md:text-3xl font-bold mb-1">{userPurchases.length}</p>
+            <p className="text-blue-100 text-xs md:text-sm mb-2">Total Transactions</p>
+            <p className="text-base md:text-lg font-semibold">₦{totalPurchaseAmount.toLocaleString()}</p>
           </div>
 
           <div className="bg-gradient-to-br from-green-500 to-emerald-600 rounded-2xl p-6 text-white shadow-lg">
@@ -1380,9 +1380,9 @@ const App = () => {
               <ShoppingCart size={32} />
               <div className="bg-white/20 rounded-full px-3 py-1 text-xs font-semibold">Sales</div>
             </div>
-            <p className="text-3xl font-bold mb-1">{userSales.length}</p>
-            <p className="text-green-100 text-sm mb-2">Total Transactions</p>
-            <p className="text-lg font-semibold">₦{totalSalesAmount.toLocaleString()}</p>
+            <p className="text-2xl md:text-3xl font-bold mb-1">{userSales.length}</p>
+            <p className="text-green-100 text-xs md:text-sm mb-2">Total Transactions</p>
+            <p className="text-base md:text-lg font-semibold">₦{totalSalesAmount.toLocaleString()}</p>
           </div>
 
           <div className={`bg-gradient-to-br ${profit >= 0 ? "from-purple-500 to-pink-600" : "from-red-500 to-orange-600"} rounded-2xl p-6 text-white shadow-lg`}>
@@ -1390,9 +1390,9 @@ const App = () => {
               <TrendingUp size={32} />
               <div className="bg-white/20 rounded-full px-3 py-1 text-xs font-semibold">{profit >= 0 ? "Profit" : "Loss"}</div>
             </div>
-            <p className="text-3xl font-bold mb-1">₦{Math.abs(profit).toLocaleString()}</p>
-            <p className="text-purple-100 text-sm mb-2">{profit >= 0 ? "Net Profit" : "Net Loss"}</p>
-            <p className="text-sm">{isAdmin ? "All Helpers" : "Your Performance"}</p>
+            <p className="text-2xl md:text-3xl font-bold mb-1">₦{Math.abs(profit).toLocaleString()}</p>
+            <p className="text-purple-100 text-xs md:text-sm mb-2">{profit >= 0 ? "Net Profit" : "Net Loss"}</p>
+            <p className="text-xs md:text-sm">{isAdmin ? "All Helpers" : "Your Performance"}</p>
           </div>
 
           <div className="bg-gradient-to-br from-orange-500 to-yellow-600 rounded-2xl p-6 text-white shadow-lg">
@@ -1400,9 +1400,9 @@ const App = () => {
               <BarChart3 size={32} />
               <div className="bg-white/20 rounded-full px-3 py-1 text-xs font-semibold">Stock</div>
             </div>
-            <p className="text-3xl font-bold mb-1">{currentStock}</p>
-            <p className="text-orange-100 text-sm mb-2">Birds in Stock</p>
-            <p className="text-sm">Current Inventory</p>
+            <p className="text-2xl md:text-3xl font-bold mb-1">{currentStock}</p>
+            <p className="text-orange-100 text-xs md:text-sm mb-2">Birds in Stock</p>
+            <p className="text-xs md:text-sm">Current Inventory</p>
             {totalMortality > 0 && (
               <p className="text-xs mt-2 bg-red-500/20 rounded px-2 py-1">⚠️ {totalMortality} lost to mortality</p>
             )}
@@ -1416,7 +1416,7 @@ const App = () => {
                 <Wallet className="text-pink-600" size={24} />
                 <h3 className="text-lg font-bold text-gray-800">Total Expenses</h3>
               </div>
-              <span className="text-2xl font-bold text-pink-600">₦{totalExpenses.toLocaleString()}</span>
+              <span className="text-xl md:text-2xl font-bold text-pink-600">₦{totalExpenses.toLocaleString()}</span>
             </div>
             <p className="text-sm text-gray-600">{userExpenses.length} expense records</p>
           </div>
@@ -1427,7 +1427,7 @@ const App = () => {
                 <CreditCard className="text-orange-600" size={24} />
                 <h3 className="text-lg font-bold text-gray-800">Accounts Payable</h3>
               </div>
-              <span className="text-2xl font-bold text-orange-600">₦{totalCreditAmount.toLocaleString()}</span>
+              <span className="text-xl md:text-2xl font-bold text-orange-600">₦{totalCreditAmount.toLocaleString()}</span>
             </div>
             <p className="text-sm text-gray-600">{creditPurchases.length} credit purchases</p>
             <p className="text-xs text-gray-500 mt-1">⚠️ Need to pay suppliers</p>
@@ -1441,7 +1441,7 @@ const App = () => {
                 <ArrowUpCircle className="text-blue-600" size={24} />
                 <h3 className="text-lg font-bold text-gray-800">Money Loaned Out</h3>
               </div>
-              <span className="text-2xl font-bold text-blue-600">₦{netLoansOut.toLocaleString()}</span>
+              <span className="text-xl md:text-2xl font-bold text-blue-600">₦{netLoansOut.toLocaleString()}</span>
             </div>
             <p className="text-sm text-gray-600">
               {userLoans.filter((l) => l.type === "loan_out" && l.status === "pending").length} pending loans
@@ -2725,24 +2725,7 @@ const App = () => {
                   : "bg-white text-gray-700 hover:bg-gray-50 shadow"
               }`}
             >
-              <link.icon size={20} /> {link.label} {isAdmin && link.key !== "dashboard" && link.key !== "monitoring" && "(Admin)"}
-            </button>
-          ))}
-        </div>
-
-        <div className="md:hidden grid grid-cols-2 gap-3 mb-6">
-          {navLinks.map((link) => (
-            <button
-              key={link.key}
-              onClick={() => setActiveTab(link.key)}
-              className={`flex items-center gap-2 px-4 py-3 rounded-xl text-sm font-semibold transition border ${
-                activeTab === link.key
-                  ? "bg-gradient-to-r from-blue-600 to-purple-600 text-white border-transparent"
-                  : "bg-white text-gray-700 border-gray-200"
-              }`}
-            >
-              <link.icon size={18} />
-              <span className="text-left">{link.label}</span>
+              <link.icon size={20} /> {link.label}
             </button>
           ))}
         </div>
