@@ -26,6 +26,7 @@ import {
   Wallet,
   ArrowUpCircle,
   ArrowDownCircle,
+  Trash,
 } from "lucide-react";
 import { supabase } from './supabaseClient';
 
@@ -427,6 +428,23 @@ const App = () => {
     } catch (error) {
       console.error('Error loading data:', error);
     }
+  };
+
+  const handleDelete = async (table, id, label) => {
+    if (currentUser?.role !== "admin") return;
+
+    const confirmed = window.confirm(`Delete this ${label}? This cannot be undone.`);
+    if (!confirmed) return;
+
+    const { error } = await supabase.from(table).delete().eq('id', id);
+
+    if (error) {
+      console.error(`Error deleting ${label}:`, error);
+      alert(`Could not delete ${label}. Please try again.`);
+      return;
+    }
+
+    await loadMockData();
   };
 
 /* ========== END OF PART 1 ========== */
@@ -1882,7 +1900,7 @@ const App = () => {
               All Purchases
               {isAdmin && (
                 <span className="text-sm font-normal bg-blue-100 text-blue-700 px-3 py-1 rounded-full">
-                  View Only
+                  Admin Mode
                 </span>
               )}
             </h2>
@@ -1929,6 +1947,9 @@ const App = () => {
                   <th className="px-4 py-4 text-left text-xs font-bold text-gray-700 uppercase">Status</th>
                   <th className="px-4 py-4 text-left text-xs font-bold text-gray-700 uppercase">Recorded By</th>
                   <th className="px-4 py-4 text-left text-xs font-bold text-gray-700 uppercase">Notes</th>
+                  {isAdmin && (
+                    <th className="px-4 py-4 text-left text-xs font-bold text-gray-700 uppercase">Actions</th>
+                  )}
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
@@ -1994,6 +2015,17 @@ const App = () => {
                         <span className="text-xs text-gray-400">No notes</span>
                       )}
                     </td>
+                    {isAdmin && (
+                      <td className="px-4 py-4">
+                        <button
+                          onClick={() => handleDelete('purchases', purchase.id, 'purchase record')}
+                          className="flex items-center gap-1 text-red-600 hover:text-red-700 text-xs font-semibold bg-red-50 border border-red-200 px-3 py-1 rounded-lg"
+                        >
+                          <Trash size={14} />
+                          Delete
+                        </button>
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>
@@ -2015,7 +2047,7 @@ const App = () => {
               All Sales
               {isAdmin && (
                 <span className="text-sm font-normal bg-blue-100 text-blue-700 px-3 py-1 rounded-full">
-                  View Only
+                  Admin Mode
                 </span>
               )}
             </h2>
@@ -2061,6 +2093,9 @@ const App = () => {
                   <th className="px-4 py-4 text-left text-xs font-bold text-gray-700 uppercase">Payment</th>
                   <th className="px-4 py-4 text-left text-xs font-bold text-gray-700 uppercase">Sold By</th>
                   <th className="px-4 py-4 text-left text-xs font-bold text-gray-700 uppercase">Notes</th>
+                  {isAdmin && (
+                    <th className="px-4 py-4 text-left text-xs font-bold text-gray-700 uppercase">Actions</th>
+                  )}
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
@@ -2110,6 +2145,17 @@ const App = () => {
                         <span className="text-xs text-gray-400">No notes</span>
                       )}
                     </td>
+                    {isAdmin && (
+                      <td className="px-4 py-4">
+                        <button
+                          onClick={() => handleDelete('sales', sale.id, 'sale record')}
+                          className="flex items-center gap-1 text-red-600 hover:text-red-700 text-xs font-semibold bg-red-50 border border-red-200 px-3 py-1 rounded-lg"
+                        >
+                          <Trash size={14} />
+                          Delete
+                        </button>
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>
@@ -2132,7 +2178,7 @@ const App = () => {
                 Loans & Paybacks
                 {isAdmin && (
                   <span className="text-sm font-normal bg-blue-100 text-blue-700 px-3 py-1 rounded-full">
-                    View Only
+                    Admin Mode
                   </span>
                 )}
               </h2>
@@ -2166,6 +2212,9 @@ const App = () => {
                     <th className="px-4 py-4 text-left text-xs font-bold text-gray-700 uppercase">Status</th>
                     <th className="px-4 py-4 text-left text-xs font-bold text-gray-700 uppercase">Recorded By</th>
                     <th className="px-4 py-4 text-left text-xs font-bold text-gray-700 uppercase">Notes</th>
+                    {isAdmin && (
+                      <th className="px-4 py-4 text-left text-xs font-bold text-gray-700 uppercase">Actions</th>
+                    )}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
@@ -2223,6 +2272,17 @@ const App = () => {
                           <span className="text-xs text-gray-400">No notes</span>
                         )}
                       </td>
+                      {isAdmin && (
+                        <td className="px-4 py-4">
+                          <button
+                            onClick={() => handleDelete('loans', loan.id, 'loan entry')}
+                            className="flex items-center gap-1 text-red-600 hover:text-red-700 text-xs font-semibold bg-red-50 border border-red-200 px-3 py-1 rounded-lg"
+                          >
+                            <Trash size={14} />
+                            Delete
+                          </button>
+                        </td>
+                      )}
                     </tr>
                   ))}
                 </tbody>
@@ -2238,7 +2298,7 @@ const App = () => {
                 Expenses
                 {isAdmin && (
                   <span className="text-sm font-normal bg-blue-100 text-blue-700 px-3 py-1 rounded-full">
-                    View Only
+                    Admin Mode
                   </span>
                 )}
               </h2>
@@ -2270,6 +2330,9 @@ const App = () => {
                     <th className="px-4 py-4 text-left text-xs font-bold text-gray-700 uppercase">Amount</th>
                     <th className="px-4 py-4 text-left text-xs font-bold text-gray-700 uppercase">Recorded By</th>
                     <th className="px-4 py-4 text-left text-xs font-bold text-gray-700 uppercase">Notes</th>
+                    {isAdmin && (
+                      <th className="px-4 py-4 text-left text-xs font-bold text-gray-700 uppercase">Actions</th>
+                    )}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
@@ -2311,6 +2374,17 @@ const App = () => {
                           <span className="text-xs text-gray-400">No notes</span>
                         )}
                       </td>
+                      {isAdmin && (
+                        <td className="px-4 py-4">
+                          <button
+                            onClick={() => handleDelete('expenses', expense.id, 'expense record')}
+                            className="flex items-center gap-1 text-red-600 hover:text-red-700 text-xs font-semibold bg-red-50 border border-red-200 px-3 py-1 rounded-lg"
+                          >
+                            <Trash size={14} />
+                            Delete
+                          </button>
+                        </td>
+                      )}
                     </tr>
                   ))}
                 </tbody>
@@ -2386,7 +2460,7 @@ const App = () => {
                 : "bg-white text-gray-700 hover:bg-gray-50 shadow"
             }`}
           >
-            <Package size={20} /> Purchases {isAdmin && "(View)"}
+            <Package size={20} /> Purchases {isAdmin && "(Admin)"}
           </button>
           <button
             onClick={() => setActiveTab("sales")}
@@ -2396,7 +2470,7 @@ const App = () => {
                 : "bg-white text-gray-700 hover:bg-gray-50 shadow"
             }`}
           >
-            <ShoppingCart size={20} /> Sales {isAdmin && "(View)"}
+            <ShoppingCart size={20} /> Sales {isAdmin && "(Admin)"}
           </button>
           <button
             onClick={() => setActiveTab("loans-expenses")}
@@ -2406,7 +2480,7 @@ const App = () => {
                 : "bg-white text-gray-700 hover:bg-gray-50 shadow"
             }`}
           >
-            <Wallet size={20} /> Loans & Expenses {isAdmin && "(View)"}
+            <Wallet size={20} /> Loans & Expenses {isAdmin && "(Admin)"}
           </button>
           {isAdmin && (
             <button
